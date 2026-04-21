@@ -65,8 +65,8 @@ void serial_write(USART_TypeDef *USARTx, const char *buffer, int len);
 char serial_read(USART_TypeDef *USARTx);
 
 // motor pins
-#define BPHASE D11
-#define BENABLE D10
+#define BPHASE D2
+#define BENABLE D3
 #define APHASE D1 
 #define AENABLE D1
 
