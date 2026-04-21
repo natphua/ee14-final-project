@@ -89,3 +89,33 @@ int main() {
     }
     return 0;
 }
+
+
+
+/* RECEIVER CODE
+uint8_t RxAddress[] = {0x00,0xDD,0xCC,0xBB,0xAA};
+uint8_t RxData[32];
+
+// receiver code 
+int main() {
+    // initial configurations
+    host_serial_init();
+    delay_init(16000000);
+	NRF24_Init();
+	NRF24_RxMode(RxAddress, 10);
+    gpio_config_mode(BPHASE, OUTPUT);
+    gpio_config_mode(BENABLE, OUTPUT);
+    timer_config_pwm(TIM1, 50);
+
+
+    while(1) {
+		if (isDataAvailable(2) == 1) {
+            NRF24_Receive(RxData);
+            printf("Received data: %d %d\n", RxData[0], RxData[1]);
+            move_wheels(RxData[0], RxData[1]);
+		}
+	}
+
+    return 0;
+}
+*/
