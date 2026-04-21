@@ -64,19 +64,20 @@ void serial_write(USART_TypeDef *USARTx, const char *buffer, int len);
 // Spin wait until we have a byte.
 char serial_read(USART_TypeDef *USARTx);
 
+// motor pins
+#define BPHASE D11
+#define BENABLE D10
+#define APHASE D1 
+#define AENABLE D1
 
-// SPI and bluetooth functions
-void SPI1_Init(void);
-void EXTI4_Init(void);
-void EXTI4_IRQHandler(void);
-void nRF24_TX_Init(void);
-void nRF24_RX_Init(void);
-uint8_t SPI1_Transfer(uint8_t data);
-void    nRF24_WriteRegister(uint8_t reg, uint8_t value);
-uint8_t nRF24_ReadRegister(uint8_t reg);
-void    nRF24_ReadPayload(uint8_t *buf, uint8_t len);
-void    nRF24_SendPacket(uint8_t *data, uint8_t len);
+// joystick pins
+#define VRX D6
+#define VRY D3
 
+// calculating speeds
+#define CENTER 123
+#define DEADZONE 10
+#define MAX_PWM 1023
 
 
 #endif
