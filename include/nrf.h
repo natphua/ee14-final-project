@@ -4,11 +4,11 @@
 #include "stdint.h"
 #include "ee14lib.h"
 
-void NRF24_Init (void);
-void NRF24_TxMode (uint8_t *Address, uint8_t channel);
-uint8_t NRF24_Transmit (uint8_t *data);
-void NRF24_RxMode (uint8_t *Address, uint8_t channel);
-void NRF24_Receive (uint8_t *data)
+void NRF24_Init(void);
+void NRF24_TxMode(uint8_t *Address, uint8_t channel);
+uint8_t NRF24_Transmit(uint8_t *data);
+void NRF24_RxMode(uint8_t *Address, uint8_t channel);
+void NRF24_Receive(uint8_t *data);
 
 /* Memory Map */
 #define CONFIG      0x00
@@ -51,7 +51,5 @@ void NRF24_Receive (uint8_t *data)
 #define FLUSH_RX      0xE2
 #define REUSE_TX_PL   0xE3
 #define NOP           0xFF
-
-
 
 #endif /* NRF_H_ */

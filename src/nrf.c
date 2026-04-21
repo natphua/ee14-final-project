@@ -3,27 +3,21 @@
 #include <stm32l432xx.h>
 
 //CS = chip select, listening to SPI when selected (pulls line low)
-void CS_Select (void)
-{
-    GPIOA->BSRR=GPIO_BSRR_BR1;
+void CS_Select (void) {
+    GPIOA->BSRR = GPIO_BSRR_BR6; // Pull PA6 LOW
 }
 
-void CS_UnSelect (void)
-{
-    GPIOA->BSRR=GPIO_BSRR_BS1;
+void CS_UnSelect (void) {
+    GPIOA->BSRR = GPIO_BSRR_BS6; // Pull PA6 HIGH
 }
 
-//CE = chip enable, will actually starting receiving/transmitting
-void CE_Enable (void)
-{
-	GPIOA->BSRR=GPIO_BSRR_BS0;
-
+// CE is PA7
+void CE_Enable (void) {
+    GPIOA->BSRR = GPIO_BSRR_BS7; // Pull PA7 HIGH
 }
 
-void CE_Disable (void)
-{
-	GPIOA->BSRR=GPIO_BSRR_BR0;
-
+void CE_Disable (void) {
+    GPIOA->BSRR = GPIO_BSRR_BR7; // Pull PA7 LOW
 }
 
 
@@ -106,11 +100,45 @@ void nrfsendCmd (uint8_t cmd)
 
 void ncs_cs_init()
 {
-    /*enable clock access ti GPI)A*/
-    RCC->AHB1ENR|=RCC_AHB2ENR_GPIOAEN;
-    /*Set PA0 and PA1 as output*/
-    GPIOA->MODER|=GPIO_MODER_MODER0_0|GPIO_MODER_MODER1_0;
-    GPIOA->MODER&=~(GPIO_MODER_MODER0_1|GPIO_MODER_MODER1_1);
+    // Enable clock for GPIOA (for CE/CSN) and GPIOB (for SPI)
+    RCC->AHB2ENR |= RCC_AHB2ENR_GPIOAEN | RCC_AHB2ENR_GPIOBEN;
+
+    // Set PA6 and PA7 as Output (01 in MODER)
+    GPIOA->MODER &= ~(GPIO_MODER_MODE6 | GPIO_MODER_MODE7);
+    GPIOA->MODER |= (GPIO_MODER_MODE6_0 | GPIO_MODER_MODE7_0);
+
+    // Initial State
+    CS_UnSelect(); // PA6 HIGH
+    CE_Disable();  // PA7 LOW
+}
+
+void nrf24_reset(uint8_t REG) 
+{
+    if (REG == STATUS) 
+    {
+        nrf24_WriteReg(STATUS, 0x70);
+    }
+    else if (REG == FIFO_STATUS)
+    {
+        nrfsendCmd(FLUSH_TX);
+        nrfsendCmd(FLUSH_RX);
+    }
+    else if (REG == 0)
+    {
+        /* Complete Software Reset - Restore Power-On Reset (POR) Defaults */
+        nrf24_WriteReg(CONFIG,      0x08); // 1-byte CRC, Power Down
+        nrf24_WriteReg(EN_AA,       0x3F); // Auto-ACK on all pipes
+        nrf24_WriteReg(EN_RXADDR,   0x03); // Enable Pipe 0 and 1
+        nrf24_WriteReg(SETUP_AW,    0x03); // 5-byte address width
+        nrf24_WriteReg(SETUP_RETR,  0x03); // 250us delay, 3 retries
+        nrf24_WriteReg(RF_CH,       0x02); // Channel 2
+        nrf24_WriteReg(RF_SETUP,    0x0E); // 2Mbps, 0dBm
+        nrf24_WriteReg(STATUS,      0x70); // Clear all interrupts
+        
+        // Clear FIFOs
+        nrfsendCmd(FLUSH_TX);
+        nrfsendCmd(FLUSH_RX);
+    }
 }
 
 void NRF24_Init (void)
@@ -145,49 +173,49 @@ void NRF24_Init (void)
 
 void NRF24_TxMode (uint8_t *Address, uint8_t channel) {
     CE_Disable();
-    nrf24_WriteReg(RF_CH, channel);  // select the channel
-    nrf24_WriteRegMulti(TX_ADDR, Address, 5);  // Write the TX address
+    nrf24_WriteReg(RF_CH, channel);  
+    nrf24_WriteRegMulti(TX_ADDR, Address, 5);  
+    
+    nrf24_WriteRegMulti(RX_ADDR_P0, Address, 5); 
 
-    uint8_t config = nrf24_ReadReg(CONFIG);
-	config = config | (1<<1);   // write 1 in the PWR_UP bit
-    //	config = config & (0xF2);    // write 0 in the PRIM_RX, and 1 in the PWR_UP, and all other bits are masked
-	nrf24_WriteReg (CONFIG, config);
+    // 4. Configure the CONFIG register
+    // We want: PWR_UP = 1, PRIM_RX = 0 (for TX mode), and EN_CRC = 1
+    // A value of 0x0A (0000 1010) or 0x0E (0000 1110) is standard.
+    nrf24_WriteReg(CONFIG, 0x0A); 
 
-    // Enable the chip after configuring the device
-	CE_Enable();
+    // Enable the chip after configuring
+    CE_Enable();
 }
 
 uint8_t NRF24_Transmit(uint8_t *data) {
-    uint8_t cmdtosend = 0;
+    // 1. Load the payload
     CS_Select();
-
-    // payload command
-    cmdtosend = W_TX_PAYLOAD;
-    spi1_transmit( &cmdtosend, 1);
-
-    // send the payload
+    uint8_t cmd = W_TX_PAYLOAD;
+    spi1_transmit(&cmd, 1);
     spi1_transmit(data, 32);
+    CS_UnSelect();
 
-    // Unselect the device
-	CS_UnSelect();
-    delay(1);
+    // 2. Pulse CE to start the radio transmission
+    CE_Enable();
+    delay(1); // Wait for radio to blast
+    CE_Disable();
 
-    uint8_t fifostatus = nrf24_ReadReg(FIFO_STATUS);
-
-	// check the fourth bit of FIFO_STATUS to know if the TX fifo is empty
-	if ((fifostatus&(1<<4)) && (!(fifostatus&(1<<3))))
-	{
-		cmdtosend = FLUSH_TX;
-		nrfsendCmd(cmdtosend);
-
-		// reset FIFO_STATUS
-		nrf24_reset (FIFO_STATUS);
-
-		return 1;
-	}
-
-	return 0;
-    
+    // 3. Wait for success or failure
+    uint8_t status;
+    uint32_t timeout = 10000; 
+    while(timeout--) {
+        status = nrf24_ReadReg(STATUS);
+        if (status & (1 << 5)) { // TX_DS: Success
+            nrf24_WriteReg(STATUS, (1 << 5)); // Clear flag
+            return 1;
+        }
+        if (status & (1 << 4)) { // MAX_RT: Failed
+            nrf24_WriteReg(STATUS, (1 << 4)); // Clear flag
+            nrfsendCmd(FLUSH_TX);
+            return 0;
+        }
+    }
+    return 0; // Timeout
 }
 
 void NRF24_RxMode(uint8_t *Address, uint8_t channel) {
@@ -209,6 +237,9 @@ void NRF24_RxMode(uint8_t *Address, uint8_t channel) {
 	config = config | (1<<1) | (1<<0);
 	nrf24_WriteReg (CONFIG, config);
 
+    // Wait >=1.5ms for nRF24L01 to transition from power-down to standby-I
+    delay(2);
+
     // Enable the chip after configuring the device
 	CE_Enable();
 }
@@ -216,9 +247,8 @@ void NRF24_RxMode(uint8_t *Address, uint8_t channel) {
 uint8_t isDataAvailable (int pipenum) {
     uint8_t status = nrf24_ReadReg(STATUS);
 
-	if ((status&(1<<6))&&(status&(pipenum<<1)))
+	if ((status & (1<<6)) && (((status >> 1) & 0x07) == (uint8_t)pipenum))
 	{
-
 		nrf24_WriteReg(STATUS, (1<<6));
 
 		return 1;

@@ -35,12 +35,11 @@ uint64_t millis()
 
 
 void delay(uint32_t time)
-	{
-
+{
 	uint64_t start=millis();
 	while((millis() - start) < time);
 
-	}
+}
 
 void SysTick_Handler(void)
 {
