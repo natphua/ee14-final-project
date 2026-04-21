@@ -31,8 +31,8 @@ typedef int EE14Lib_Err;
 // Both on is an error
 
 // defining pins associated with joystick x/y
-#define VRX (EE14Lib_Pin)D3
-#define VRY (EE14Lib_Pin)D6
+// #define VRX (EE14Lib_Pin)D3
+// #define VRY (EE14Lib_Pin)D6
 
 // defining LED pins 
 #define RED (EE14Lib_Pin)D9
@@ -63,5 +63,20 @@ void serial_write(USART_TypeDef *USARTx, const char *buffer, int len);
 
 // Spin wait until we have a byte.
 char serial_read(USART_TypeDef *USARTx);
+
+
+// SPI and bluetooth functions
+void SPI1_Init(void);
+void EXTI4_Init(void);
+void EXTI4_IRQHandler(void);
+void nRF24_TX_Init(void);
+void nRF24_RX_Init(void);
+uint8_t SPI1_Transfer(uint8_t data);
+void    nRF24_WriteRegister(uint8_t reg, uint8_t value);
+uint8_t nRF24_ReadRegister(uint8_t reg);
+void    nRF24_ReadPayload(uint8_t *buf, uint8_t len);
+void    nRF24_SendPacket(uint8_t *data, uint8_t len);
+
+
 
 #endif

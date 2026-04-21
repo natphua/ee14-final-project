@@ -72,27 +72,59 @@ void move_wheels(int x, int y) {
     }
 }
 
+// int main() {
+//     // initial configurations
+//     gpio_config_mode(BPHASE, OUTPUT);
+//     gpio_config_mode(BENABLE, OUTPUT);
+//     host_serial_init();
+//     timer_config_pwm(TIM1, 50);
+
+//     while (1) {
+//         /* Read XY position of joystick. */
+//         /* Ranges from 0 to 1023. */
+//         adc_config_single(VRX);
+//         uint8_t raw_x = adc_read_single();
+
+//         adc_config_single(VRY);
+//         uint8_t raw_y = adc_read_single();
+
+//         /* Move wheels based on joystick position. */
+//         move_wheels(raw_x, raw_y);
+
+//         for (volatile int i = 0; i < 1000; i++) {}
+        
+//     }
+//     return 0;
+// }
+
+// transmitter code 
 int main() {
     // initial configurations
-    gpio_config_mode(BPHASE, OUTPUT);
-    gpio_config_mode(BENABLE, OUTPUT);
     host_serial_init();
     timer_config_pwm(TIM1, 50);
+    SPI1_Init();
+    EXTI4_Init();
+    nRF24_TX_Init();
+
+    uint8_t payload[4] = {0x01, 0x02, 0x03, 0x04};
 
     while (1) {
-        /* Read XY position of joystick. */
-        /* Ranges from 0 to 1023. */
-        adc_config_single(VRX);
-        uint8_t raw_x = adc_read_single();
+        nRF24_SendPacket(payload, 4);
 
-        adc_config_single(VRY);
-        uint8_t raw_y = adc_read_single();
+        uint8_t status = nRF24_ReadRegister(0x07); 
+        printf("TX Status: %d\n", status);
 
-        /* Move wheels based on joystick position. */
-        move_wheels(raw_x, raw_y);
+        if (status & (1 << 4)) { // If MAX_RT (Max retransmits reached)
+            printf("Failed to get ACK!\n");
+            // Flush TX FIFO to clear the clog
+            GPIOA->BSRR = GPIO_BSRR_BR6; 
+            SPI1_Transfer(0xE1); // Flush TX command
+            GPIOA->BSRR = GPIO_BSRR_BS6;
+        }
 
-        for (volatile int i = 0; i < 1000; i++) {}
-        
+        nRF24_WriteRegister(0x07, 0x70); // Clear all flags
+
+        for (volatile int i = 0; i < 100000; i++) {}
     }
     return 0;
 }
