@@ -20,7 +20,7 @@ void move_wheels(int x, int y) {
     if (steer < DEADZONE && steer > -DEADZONE) steer = 0;
 
     // 3. differential steering logic
-    int left_val  = drive;
+    int left_val  = drive + steer;
     int right_val = drive - steer;
     
     // 4. scale to pwm range

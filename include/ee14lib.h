@@ -67,8 +67,8 @@ char serial_read(USART_TypeDef *USARTx);
 // motor pins
 #define BPHASE D2
 #define BENABLE D3
-#define APHASE D1 
-#define AENABLE D1
+#define APHASE D5
+#define AENABLE D6
 
 // joystick pins
 #define VRX D6
