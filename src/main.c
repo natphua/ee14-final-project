@@ -1,7 +1,9 @@
 #include <stm32l432xx.h>
+#include <stdio.h>
 #include "ee14lib.h"
 #include "spi.h"
 #include "nrf.h"
+#include "delay.h"
 
 int _write(int file, char *data, int len) {
     serial_write(USART2, data, len);
@@ -18,7 +20,8 @@ void move_wheels(int x, int y) {
     if (steer < DEADZONE && steer > -DEADZONE) steer = 0;
 
     // 3. differential steering logic
-    int left_val  = drive;
+    // left = motor B, right = motor A
+    int left_val  = drive + steer;
     int right_val = drive - steer;
     
     // 4. scale to pwm range
@@ -58,38 +61,33 @@ void move_wheels(int x, int y) {
     }
 }
 
-uint8_t TxAddress[] = {0xEE,0xDD,0xCC,0xBB,0xAA};
-uint8_t TxData[] = "Hello World\n";
+uint8_t RxAddress[] = {0x00,0xDD,0xCC,0xBB,0xAA};
+uint8_t RxData[32];
 
-// transmitter code 
+// receiver code 
 int main() {
     // initial configurations
     host_serial_init();
     delay_init(16000000);
 	NRF24_Init();
-	NRF24_TxMode(TxAddress, 10);
-    
+	NRF24_RxMode(RxAddress, 10);
 
-    uint8_t payload[4] = {0x01, 0x02, 0x03, 0x04};
+    gpio_config_mode(BPHASE, OUTPUT);
+    gpio_config_mode(BENABLE, OUTPUT);
+    gpio_config_mode(APHASE, OUTPUT);
+    gpio_config_mode(AENABLE, OUTPUT);
 
-    while (1) {
-        nRF24_SendPacket(payload, 4);
+    timer_config_pwm(TIM1, 50);
 
-        uint8_t status = nRF24_ReadRegister(0x07); 
-        printf("TX Status: %d\n", status);
 
-        if (status & (1 << 4)) { // If MAX_RT (Max retransmits reached)
-            printf("Failed to get ACK!\n");
-            // Flush TX FIFO to clear the clog
-            GPIOA->BSRR = GPIO_BSRR_BR6; 
-            SPI1_Transfer(0xE1); // Flush TX command
-            GPIOA->BSRR = GPIO_BSRR_BS6;
-        }
+    while(1) {
+		if (isDataAvailable(2) == 1) {
+            NRF24_Receive(RxData);
+            printf("Received data: %d %d\n", RxData[0], RxData[1]);
+            move_wheels(RxData[0], RxData[1]);
+		}
+	}
 
-        nRF24_WriteRegister(0x07, 0x70); // Clear all flags
-
-        for (volatile int i = 0; i < 100000; i++) {}
-    }
     return 0;
 }
 
